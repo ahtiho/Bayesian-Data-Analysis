@@ -1,0 +1,187 @@
+---
+title: "Assignment 2"
+author: "anonymous"
+pdf:
+  geometry: default
+  number-sections: yes
+  code-annotations: none
+output: pdf_document
+---
+
+
+
+
+Loading the library and the data.
+
+```{r}
+library(aaltobda)
+data("algae")
+# The data are now stored in the variable `algae`.
+# These are the values for the prior required in the assignment
+prior_alpha = 2
+prior_beta = 10
+```
+
+The below data is **only for the tests**, you need to change to the full data `algae` when reporting your results.
+
+```{r}
+algae_test <- c(0, 1, 1, 0, 0, 0)
+```
+
+## (a)
+
+Write the likelihood, the prior and the posterior here!
+```{r}
+y = 44
+n = 274
+p = seq(0,1,length=100)
+```
+
+Likelihood 
+\begin{align*}
+$$
+p(y |\pi) = \binom{n}{y} \pi^x (1-\pi)^{n-y}
+$$
+\end{align*}
+
+Prior 
+
+\begin{align*}
+
+$$
+P(\theta) = \frac{1}{\text{Beta}(\alpha, \beta)} \theta^ {\alpha - 1} (1 - \theta)^{\beta - 1}
+$$
+\end{align*}
+
+Posterior
+\begin{align*}
+$$
+\pi | y \sim \text{Beta}(y + \alpha, n - y + \beta)
+$$
+\end{align*}
+
+Since there has been recorded 44 instances of algae in the dataset, we set Y = 44 and since the number of observations is 274, we get the following parameters for the posterior
+
+\begin{align*}
+\pi | y \sim \text{Beta}(46, 240)
+\end{align*}
+
+
+## (b)
+
+Keep the below name and format for the functions to work with `markmyassignment`:
+
+
+```{r}
+# Useful function: qbeta()
+
+beta_point_est <- function(prior_alpha, prior_beta, data) {
+    y = sum(data)
+    n = length(data)
+    posterior_alpha = prior_alpha + y
+    posterior_beta = prior_beta + (n-y)
+    posterior_mean = posterior_alpha/(posterior_beta+posterior_alpha)
+    return(posterior_mean)
+}
+beta_interval <- function(prior_alpha, prior_beta, data, prob=0.9) {
+    y = sum(data)
+    n = length(data)
+    posterior_alpha = prior_alpha + y
+    posterior_beta = prior_beta + (n-y)
+    upper = quantile(qbeta(p, posterior_alpha, posterior_beta), prob = 0.95)
+    lower = quantile(qbeta(p, posterior_alpha, posterior_beta), prob = 0.05)
+    
+    
+    return(c(lower,upper))
+}
+
+print(beta_point_est(prior_alpha, prior_beta, algae))
+print(beta_interval(prior_alpha, prior_beta, algae, prob = 0.9))
+```
+
+The posterior mean estimate is roughly 0.16
+The posterior interval is from 0.126 to 0.197
+## (c)
+
+Keep the below name and format for the function to work with `markmyassignment`:
+
+```{r}
+# Useful function: pbeta()
+
+beta_low <- function(prior_alpha, prior_beta, data, pi_0=0.2) {
+    y = sum(data)
+    n = length(data)
+    posterior_alpha = prior_alpha + y
+    posterior_beta = prior_beta + (n-y)
+    return(pbeta(pi_0,posterior_alpha, posterior_beta))
+}
+
+print(beta_low(prior_alpha, prior_beta, algae, pi_0 = 0.2))
+```
+The  probability that the proportion of monitoring sites with detectable algae levels is smaller than 0.2 equals to roughly 0.96
+
+
+## (d)
+
+Write your answer here!
+
+- The presence of algae in a lake should be independent from the presence of algae in other lakes
+- We should assume that the probability of algae being present is equal across all lakes
+- We should have enough data to make conclusions based on the data, for example a dataset of 3 observations will not take us far
+
+
+
+## (e)
+
+Plot the PDFs here. Explain shortly what you do.
+
+Let's first create a few new prior values for the prior beta function.
+```{r}
+# Useful function: dbeta()
+y = 44
+n = 274
+
+#The prior values used earlier in the assignment
+prior_alpha = 2
+prior_beta = 10
+
+posterior_alpha = prior_alpha + y
+posterior_beta = prior_beta + (n-y)
+
+#Let's create 3 separate prior values for comparison
+prior_alpha_1 = 6
+prior_beta_1 = 24
+
+posterior_alpha_1 = prior_alpha_1+ y
+posterior_beta_1 = prior_beta_1 + (n-y)
+
+prior_alpha_2 = 18
+prior_beta_2 = 100
+
+posterior_alpha_2 = prior_alpha_2 + y
+posterior_beta_2 = prior_beta_2 + (n-y)
+
+prior_alpha_3 = 30
+prior_beta_3 = 150
+
+posterior_alpha_3 = prior_alpha_3 + y
+posterior_beta_3 = prior_beta_3 + (n-y)
+
+
+
+
+
+#The posteriors plotted with four different prior parameters
+plot(p, dbeta(p,posterior_alpha, posterior_beta), type = "l", col = "red", ylab = "Density", xlab = expression(pi), ylim = c(0,25))
+lines(p, dbeta(p,posterior_alpha_1, posterior_beta_1), type = "l", col = "blue")
+lines(p, dbeta(p,posterior_alpha_2, posterior_beta_2), type = "l", col = "purple")
+lines(p, dbeta(p,posterior_alpha_3, posterior_beta_3), type = "l", col = "green")
+legend("topright", legend = c("Posterior with the prior Beta(2,10)","Posterior with the prior Beta(6,24)","Posterior with the prior Beta(18,100)","Posterior with the prior Beta(30,150)"), col = c("red", "blue", "purple", "green"), lty = c(1))
+```
+
+As we can see from the plotted figure, the posterior seems to be very consistent regardless of the parameters given to the prior. 
+
+
+## Use of AI
+
+I used AI in the report to find out errors in my Latex syntax, also there was an issue with the pdf formatting issues, that were solved using AI. 

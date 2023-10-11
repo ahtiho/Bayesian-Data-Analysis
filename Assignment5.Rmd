@@ -1,0 +1,255 @@
+---
+title: "Assignment 5"
+author: anonymous # <-- hand in anonymously
+format: 
+  pdf:  
+    geometry:
+    - left=1cm,top=1cm,bottom=1cm,right=7cm
+    number-sections: true
+    code-annotations: none
+editor: source
+---
+
+
+# General information
+
+:::: {.content-hidden}
+::: {.callout-warning collapse=true}
+ 
+## Setup 
+
+
+
+I wasn't able to hide the installing parts, due to some issue with Rstudio, so that is why they're visible
+  
+
+The following installs and loads the `aaltobda` package:
+```{r}
+if(!require(aaltobda)){
+    install.packages("remotes")
+    remotes::install_github("avehtari/BDA_course_Aalto", subdir = "rpackage", upgrade="never")
+    library(aaltobda)
+}
+```
+The following installs and loads the [`latex2exp` package](https://github.com/stefano-meschiari/latex2exp), which allows us to use LaTeX in plots:
+```{r}
+if(!require(latex2exp)){
+    install.packages("latex2exp")
+    library(latex2exp)
+}
+```
+The following installs and loads the [`posterior` package](https://github.com/stan-dev/posterior) which imports the `rhat_basic()` function:
+```{r}
+if(!require(posterior)){
+    install.packages("posterior")
+    library(posterior)
+}
+```
+The following installs and loads the [`ggplot2` package](https://ggplot2.tidyverse.org/) and the [`bayesplot` package](https://mc-stan.org/bayesplot/index.html)
+```{r}
+if(!require(ggplot2)){
+    install.packages("ggplot2")
+    library(ggplot2)
+}
+if(!require(bayesplot)){
+    install.packages("bayesplot")
+    library(bayesplot)
+}
+```
+
+
+ 
+
+
+# Generalized linear model: Bioassay model with Metropolis algorithm
+
+AI was used to help with latex code in this assignment.
+## (a)
+
+
+Write your answers/code here!
+```{r}
+# Useful functions: runif, rnorm
+# bioassaylp, dmvnorm (from aaltobda)
+
+
+data("bioassay")
+
+# Start by implementing a function called `density_ratio` to
+# compute the density ratio function, $r$ in Eq. (11.1) in BDA3:
+density_ratio <- function(alpha_propose, alpha_previous, beta_propose, beta_previous, x, y, n){
+    # Do computation here, and return as below.
+    # Below are the correct return values for two different calls of this function:
+
+    # alpha_propose = 1.89, alpha_previous = 0.374,
+    # beta_propose = 24.76, beta_previous = 20.04,
+    # x = bioassay$x, y = bioassay$y, n = bioassay$n
+    #1.305179
+
+    # alpha_propose = 0.374, alpha_previous = 1.89,
+    # beta_propose = 20.04, beta_previous = 24.76,
+    # x = bioassay$x, y = bioassay$y, n = bioassay$n
+    #0.7661784
+    mean_vector = c(0,10)
+    covariance_matrix = matrix(c(2^2,12,12,10^2), ncol = 2, nrow = 2)
+    prior_density_prev = dmvnorm(c(alpha_previous, beta_previous), mean = mean_vector, sigma  = covariance_matrix, log = TRUE)
+    #prior_density_prevb = dmvnorm(beta_previous, mean = mean_vector, sigma = covariance_matrix)
+    #prior_density_prev = prior_density_prevb + prior_density_preva
+    likelihood_prev = bioassaylp(alpha_previous, beta_previous, x,y,n)
+    
+    posterior_prev = likelihood_prev + prior_density_prev
+    
+    #Calculating the propose
+    prior_density_prop = dmvnorm(c(alpha_propose,beta_propose), mean = mean_vector, sigma = covariance_matrix, log = TRUE)
+  
+    posterior <- bioassaylp(alpha_propose, beta_propose, x, y, n) + prior_density_prop
+    
+    ratio = exp(posterior-posterior_prev)
+    return (ratio)
+}
+# Then implement a function called `metropolis_bioassay()` which
+# implements the Metropolis algorithm using the `density_ratio()`:
+metropolis_bioassay <- function(num_chains, num_iterations, alpha_initial, beta_initial, alpha_sigma, beta_sigma, x, y, n) {
+    
+    thetas <- array(dim = c(num_iterations, num_chains, 2))  # 2 for alpha and beta
+    initial_alphas = c(5,-5,3,0)
+    initial_betas = c(10, -19, 0, 20)
+    for (chain_index in 1:num_chains) {
+        alpha_initial <- initial_alphas[chain_index]
+        beta_initial <- initial_betas[chain_index]
+        print(alpha_initial)
+        print(beta_initial)
+        alpha_current <- alpha_initial
+        beta_current <- beta_initial
+        
+        for (iteration in 1:num_iterations) {
+          
+            alpha_propose <- rnorm(1, mean = alpha_current, sd = alpha_sigma)
+            beta_propose <- rnorm(1, mean = beta_current, sd = beta_sigma)
+       
+            ratio <- density_ratio(alpha_propose, alpha_current, beta_propose, beta_current, x, y, n)
+            
+           
+            if (runif(1) < ratio) {
+                alpha_current <- alpha_propose
+                beta_current <- beta_propose
+            }
+            
+            
+            thetas[iteration, chain_index, 1] <- alpha_current
+            thetas[iteration, chain_index, 2] <- beta_current
+        }
+    }
+    
+    return(thetas)
+}
+
+num_chains <- 4
+
+
+num_iterations <- 5000
+
+
+alpha_initial <- 1
+beta_initial <- 1
+alpha_sigma <- 1
+beta_sigma <- 5
+
+
+thetas <- metropolis_bioassay(num_chains, num_iterations, alpha_initial, beta_initial, alpha_sigma, beta_sigma, bioassay$x, bioassay$y, bioassay$n)
+dimnames(thetas)[[3]] <- c("alpha", "beta")
+warmup_length <- num_iterations / 10 
+thetas <- thetas[(warmup_length + 1):num_iterations, , ] 
+
+
+```
+
+
+
+## (b)
+
+
+Write your answers/code here!
+
+```{r}
+summarise_draws(thetas)
+mcmc_acf(thetas)
+```
+
+
+1. The Metropolis algorithm is a way to sample observations from a distribution. Based from an initial value, the algorithm starts sampling new random values as proposals. Then a ratio is calulated from the proposals density and from the previous' density. If the ratio exceeds a randomly sampled value between 0 and 1, the proposal is then accepted into the distribution, and the loop will start again. If not, the loop will start over again and we'll try a new proposal. 
+
+2. 
+
+
+$$
+\alpha^* \sim \mathcal{N}(\alpha_{t-1}, \sigma = 1)\ and \ \beta^* \sim \mathcal{N}(\beta_{t-1}, \sigma = 5)
+$$
+
+I chose the proposal distribution presented in the assignment and chose to try a few different sigmas but ended up taking the simple route and choosing the proposed values for the sigmas. 
+
+3. 
+
+Starting points for alpha and beta are respectively 5,-5, 3, 0 and 10, -19, 0, 20. They were selected randomly.
+
+4. 
+
+The number of iterations is set to 5000 per chain
+
+5. 
+
+The warmup length used in this simulation is 500 iterations
+
+6. 
+
+I'm using 4 chains for this simulation
+
+
+Have a look at [`bayesplot` trace plot examples](http://mc-stan.org/bayesplot/reference/MCMC-traces.html#examples) and tune your plot if wanted/needed. Don't forget to include a title/caption/description.
+
+**The below example plot only includes a single chain, but your report should include a plot with multiple chains overlayed!**
+
+7 and 8. Below the chains for alpha and beta plotted
+The convergence of the chains is hard to notice in these plots but it starts to get more evident the further we move up the draws. Especially after 2000 draws the convergence is visually much more noticable than before in both plots. 
+```{r}
+
+# Useful functions: mcmc_trace (from bayesplot)
+
+mcmc_trace(thetas, pars = c("alpha", "beta"))
+```
+
+
+
+## (c)
+
+
+Write your answers/code here!
+```{r}
+# Useful functions: rhat_basic (from posterior)
+summarise_draws(thetas, rhat = rhat_basic)
+
+
+```
+1. The R_hat value describes how the different chains mix together, and if convergence has been achieved. A R-hat value of more than 1 suggests that the chains haven't been converged and that the sample preferably shoudln't be used. The rhat values are calculated by using the ratio of within and between-chain variances. 
+
+$$
+Rhat = \sqrt\frac{\text{var}^+ (\psi|y)}  W
+$$
+Where
+$$
+{\text{var}^+ (\psi|y) = \frac{n-1}{n}W + \frac{1}{n} B}
+$$
+
+2. I didn't have to adjust the posterior distribution to gain sufficient rhat values, I calculated the rhat values using the basic split Rhat function used in the demo. The rhat values for beta and alpha are both equal to 1.00. This can be interpreted as that it is likely that the chains have converged. 
+## (c)
+
+
+Write your answers/code here!
+
+Have a look at [`bayesplot` scatter plot examples](https://mc-stan.org/bayesplot/reference/MCMC-scatterplots.html#examples) and tune your plot if wanted/needed. Don't forget to include a title/caption/description.
+```{r}
+# Useful functions: mcmc_scatter (from bayesplot)
+mcmc_scatter(thetas, pars=c("alpha", "beta"))
+```
+
+

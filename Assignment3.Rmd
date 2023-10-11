@@ -1,0 +1,534 @@
+---
+title: "Assignment 3"
+author: "anonymous"
+format:
+  html:
+    toc: yes
+    code-tools: yes
+    code-line-numbers: yes
+    number-sections: yes
+    mainfont: Georgia, serif
+    page-layout: article
+  pdf:
+    geometry: left=1cm,top=1cm,bottom=1cm,right=7cm
+    number-sections: yes
+    code-annotations: none
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+editor: source
+---
+
+# General information
+
+::: {.content-hidden when-format="pdf"}
+::: {.callout-warning collapse="false"}
+## Setup
+
+*This block will only be visible in your HTML output, but will be hidden
+when rendering to PDF with quarto for the submission.* **Make sure that
+this does not get displayed in the PDF!**
+
+This is the template for [assignment 3](assignment3.html). You can
+download the qmd-files
+([full](https://avehtari.github.io/BDA_course_Aalto/assignments/template3.qmd),
+[simple](https://avehtari.github.io/BDA_course_Aalto/assignments/simple_template3.qmd))
+or copy the code from this rendered document after clicking on
+`</> Code` in the top right corner.
+
+**Please replace the instructions in this template by your own text,
+explaining what you are doing in each exercise.**
+
+The following will set-up
+[`markmyassignment`](https://github.com/MansMeg/markmyassignment) to
+check your functions at the end of the notebook:
+
+The following installs and loads the `aaltobda` package:
+
+```{r}
+if(!require(aaltobda)){
+    install.packages("remotes")
+    remotes::install_github("avehtari/BDA_course_Aalto", subdir = "rpackage", upgrade="never")
+    library(aaltobda)
+}
+```
+
+The following installs and loads the [`latex2exp`
+package](https://github.com/stefano-meschiari/latex2exp), which allows
+us to use LaTeX in plots:
+
+```{r}
+if(!require(latex2exp)){
+    install.packages("latex2exp")
+    library(latex2exp)
+}
+```
+:::
+:::
+
+::: {.content-hidden when-format="pdf"}
+::: {.callout-tip collapse="false"}
+## Showcase: Setting up advanced packages (`posterior` and `ggdist`)
+
+*This block will only be visible in your HTML output, but will be hidden
+when rendering to PDF with quarto for the submission.* **Make sure that
+this does not get displayed in the PDF!**
+
+*This block showcases advanced tools, which you will be allowed and
+expected to use after this assignment.* **For now, you should solve the
+assignment without the tools showcased herein.**
+
+The following installs and loads the [`posterior`
+package](https://mc-stan.org/posterior/index.html), which allows us to
+use its [`rvar` Random Variable
+Datatype](https://mc-stan.org/posterior/articles/rvar.html):
+
+```{r}
+if(!require(posterior)){
+    install.packages("posterior")
+    library(posterior)
+}
+```
+
+The following installs and loads the [`ggdist`
+package](https://mjskay.github.io/ggdist/) for advanced plotting
+functions:
+
+```{r}
+if(!require(ggplot2)){
+    install.packages("ggplot2")
+    library(ggplot2)
+}
+ggplot2::theme_set(theme_minimal(base_size = 14))
+if(!require(ggdist)){
+    install.packages("ggdist")
+    library(ggdist)
+}
+```
+
+*This block showcases advanced tools, which you will be allowed and
+expected to use after this assignment.* **For now, you should solve the
+assignment without the tools showcased herein.**
+:::
+:::
+
+# Inference for normal mean and deviation (3 points)
+
+Loading the library and the data.
+
+```{r}
+data("windshieldy1")
+# The data are now stored in the variable `windshieldy1`.
+# The below displays the data:
+windshieldy1
+```
+
+The below data is **only for the tests**, you need to change to the full
+data `windshieldy1` when reporting your results.
+
+```{r}
+windshieldy_test <- c(13.357, 14.928, 14.896, 14.820)
+```
+
+## (a)
+
+Write your answers here!
+
+Likelihood:
+
+
+$$
+L(\mu, \sigma^2|y) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_i - \mu)^2}{2\sigma^2}\right) 
+$$
+
+Prior
+
+
+$$
+p(µ, \sigma^2) \propto (\sigma^2)^{-1}
+$$
+
+Posterior
+
+$$
+p(\mu, \sigma^2 | y) = \sigma^{-n-2} \exp\left(-\frac{1}{2\sigma^2} \left[(n-1)s^2 + n(y - \mu)^2\right]\right)
+$$
+## (b)
+
+Write your answers and code here!
+
+**Keep the below name and format for the functions to work with
+`markmyassignment`:**
+
+```{r}
+# Useful functions: mean(), length(), sqrt(), sum()
+# and qtnew(), dtnew() (from aaltobda)
+
+mu_point_est <- function(data) {
+    
+    return(mean(data))
+    
+}
+mu_interval <- function(data, prob = 0.95) {
+    n = length(data)
+    avg  = mean(data)
+    df = n-1
+    s = sd(data)
+
+    alpha = 1-prob
+    t = qtnew(1- alpha/2, df)  
+    se <- s / sqrt(n)
+    margin = se * t
+    interval_lower = avg-margin
+    interval_higher = avg + margin
+    return(c(interval_lower, interval_higher))
+    
+}
+
+print(mu_point_est(windshieldy1))
+print(mu_interval(windshieldy1, prob = 0.95))
+
+
+```
+
+The value of the point estimate is 14.61 and the value for the interval
+limits are [13.48, 15.744]
+
+You can plot the density as below if you implement `mu_pdf` to compute
+the PDF of the posterior $p(\mu|y)$ of the average hardness ${\mu}$.
+
+```{r}
+#| label: fig-2b-density
+#| fig-cap: PDF of the posterior $p(\mu|y)$ of the average hardness $\mu$
+mu_pdf <- function(data, x){
+    # Compute necessary parameters here.
+    # These are the correct parameters for `windshieldy_test` 
+    # with the provided uninformative prior.
+    n = length(data)
+    df = n-1
+    location = mean(data)
+    scale = sqrt(sd(data)^2/length(data))
+    # Use the computed parameters as below to compute the PDF:
+    print(scale)
+    return(dtnew(x, df, location, scale))
+}
+
+conf_interval = mu_interval(windshieldy1, .999)
+
+lower = conf_interval[1]
+upper= conf_interval[2]
+x = seq(lower, upper, length.out=1000)
+plot(
+    x, mu_pdf(windshieldy1, x), type="l", 
+    xlab=TeX(r'(average hardness $\mu$)'), 
+    ylab=TeX(r'(PDF of the posterior $p(\mu|y)$)')
+)
+```
+
+Based on these results we can conclude that the population mean $\mu$
+will fall in between this interval with a 95% confidence.
+
+## (c)
+
+Write your answers and code here!
+
+**Keep the below name and format for the functions to work with
+`markmyassignment`:**
+
+```{r}
+# Useful functions: mean(), length(), sqrt(), sum()
+# and qtnew(), dtnew() (from aaltobda)
+
+mu_pred_point_est <- function(data) {
+    # Do computation here, and return as below.
+    # This is the correct return value for the test data provided above.
+    return(mean(data))
+    #14.5
+    
+}
+mu_pred_interval <- function(data, prob = 0.95) {
+  
+  probability = prob
+  df = length(data)-1
+  avg = mean(data)
+  s = sd(data)
+  alpha = 1-probability
+  t_value = qt(1-alpha/2, df)
+  
+ 
+  lower = avg-t_value * s * sqrt(1+1/length(data))
+  upper = avg+t_value * s * sqrt(1+1/length(data))
+  
+  
+
+
+
+
+    return(c(lower, upper))
+}
+
+print(mu_pred_point_est(windshieldy1))
+print(mu_pred_interval(windshieldy1))
+```
+
+The predictions for the point estimate and confidence interval are the
+following: 14.61 and \[11.03,18.2\]
+
+You can plot the density as below if you implement `mu_pred_pdf` to
+compute the PDF of the posterior predictive $p(\tilde{y}|y)$ of a new
+hardness observation $\tilde{y}$.
+
+```{r}
+#| label: fig-2c-density
+#| fig-cap: PDF of the posterior predictive $p(\tilde{y}|y)$ of a new hardness observation $\tilde{y}$
+mu_pred_pdf <- function(data, x){
+    # Compute necessary parameters here.
+    # These are the correct parameters for `windshieldy_test` 
+    # with the provided uninformative prior.
+    df = length(data)-1
+    location = mean(data)
+    scale = sd(data)*(sqrt(1+1/length(data)))
+    print(scale)
+    #0.8536316
+    # Use the computed parameters as below to compute the PDF:
+     
+    dtnew(x, df, location, scale)
+}
+
+x_interval = mu_pred_interval(windshieldy1, .999)
+lower_x = x_interval[1]
+upper_x = x_interval[2]
+x = seq(5, 25, length.out=1000)
+plot(
+    x, mu_pred_pdf(windshieldy1, x), type="l", 
+    xlab=TeX(r'(new hardness observation $\tilde{y}$)'), 
+    ylab=TeX(r'(PDF of the posterior predictive $p(\tilde{y}|y)$)')
+)
+```
+
+# Inference for the difference between proportions (3 points)
+
+## (a)
+
+Write your answers here! Likelihood:
+
+```{=tex}
+\begin{align*}
+p(y|\theta) &\propto \prod_{j=1}^{k} \theta^{y_j}
+\end{align*}
+```
+Prior
+We're setting a uniform prior of $\alpha_1 = 1$ for all $j$.
+```{=tex}
+\begin{align*}
+p(\theta | \alpha) &\propto \prod_{j=1}^{k} \theta^{\alpha_j - 1}
+\end{align*}
+```
+Posterior
+
+Written in the course book : "The resulting posterior distribution for
+the ${\theta_j}$ 's is Dirichlet with parameters ${\alpha_j}$ + ${y_j}$
+
+With a noninformative uniform prior distribution on ${\theta, \alpha1 = \alpha2 = 1}$, the
+posterior distributions for ${(\theta1, \theta2)}$is Dirichlet(40, 675) and Dirichlet(23,681)
+
+## (b)
+
+Write your answers and code here!
+
+The below data is **only for the tests**:
+
+```{r}
+set.seed(4711)
+ndraws = 1000
+p0 = rbeta(ndraws, 5, 95)
+p1 = rbeta(ndraws, 10, 90)
+
+```
+
+**Keep the below name and format for the functions to work with
+`markmyassignment`:**
+
+```{r}
+
+deaths_p0 = 39 
+deaths_p1 = 22
+total_p0 = 674
+total_p1 = 680
+
+
+prior_alpha = 1
+prior_beta = 1
+
+
+set.seed(4711)
+ndraws = 1000
+p0 = rbeta(ndraws, deaths_p0+prior_alpha, total_p0+prior_beta)
+p1 = rbeta(ndraws, deaths_p1+prior_alpha, total_p1+prior_beta)
+
+
+```
+
+```{r}
+# Useful function: mean(), quantile()
+
+posterior_odds_ratio_point_est <- function(p0, p1) {
+    # Do computation here, and return as below.
+    # This is the correct return value for the test data provided above.
+    or = (p1/(1-p1))/(p0/(1-p0))
+    return (mean(or))
+    
+}
+posterior_odds_ratio_interval <- function(p0, p1, prob = 0.95) {
+    limit = (1-prob)/2
+    or = (p1/(1-p1))/(p0/(1-p0))
+    credible_interval <- quantile(or, c(limit, 1-limit))
+    #c(0.6796942,7.3015964)
+    
+    return (credible_interval)
+}
+or = (p1/(1-p1))/(p0/(1-p0))
+print(posterior_odds_ratio_point_est(p0,p1))
+print(posterior_odds_ratio_interval(p0,p1, 0.95))
+hist(or, main = " Odds Ratio Histogram", xlab = "Odds Ratio", col = "lightblue")
+
+```
+
+Based on these simulations of the control and treatment groups, we can
+conclude that the odds ratio will fall inbetween values of 0.331 and
+0.947 with a probability of 95%. The histogram displays that the values
+concentrate heavily around an odds ratio of 0.5, like the calculated
+point estimate of the odds ratio suggests.
+
+
+## (c)
+
+Assuming that in the rubric when referenced to computations in part a),
+it was intended to reference to the computations in part b)
+
+```{r}
+
+
+prior_alpha_1 = 4
+prior_beta_1 = 4
+deaths_p0 = 39 
+deaths_p1 = 22
+total_p0 = 674
+total_p1 = 680
+
+prior_alpha_1 = 4
+prior_beta_1 = 4
+prior_alpha_2 = 8
+prior_beta_2 = 8
+
+
+set.seed(4711)
+ndraws = 1000
+p0_1 = rbeta(ndraws, deaths_p0+prior_alpha_1, total_p0+prior_beta_1)
+p1_1 = rbeta(ndraws, deaths_p1+prior_alpha_1, total_p1+prior_beta_1)
+
+p0_2 = rbeta(ndraws, deaths_p0+prior_alpha_2, total_p0+prior_beta_2)
+p1_2 = rbeta(ndraws, deaths_p1+prior_alpha_2, total_p1+prior_beta_2)
+
+or_1 = (p1_1/(1-p1_1))/(p0_1/(1-p0_1))
+print(posterior_odds_ratio_point_est(p0_1,p1_1))
+print(posterior_odds_ratio_interval(p0_1,p1_1, 0.95))
+hist(or_1, main = " Odds Ratio Histogram", xlab = "Odds Ratio", col = "lightblue")
+
+or_2 = (p1_2/(1-p1_2))/(p0_2/(1-p0_2))
+print(posterior_odds_ratio_point_est(p0_2,p1_2))
+print(posterior_odds_ratio_interval(p0_2,p1_2, 0.95))
+hist(or_2, main = " Odds Ratio Histogram", xlab = "Odds Ratio", col = "lightblue")
+```
+
+Looking at the results from using different priors, we can see a clear
+trend of the odds ratio moving towards 1. This means that the difference
+between the survival rate between the control and treatment groups is
+getting smaller. This is due to the probability of death increasing in
+both groups.
+
+# Inference for the difference between normal means (3 points)
+
+Loading the library and the data.
+
+```{r}
+data("windshieldy2")
+# The new data are now stored in the variable `windshieldy2`.
+# The below displays the first few rows of the new data:
+head(windshieldy2)
+```
+
+## (a)
+
+Write your answers here!
+
+Likelihood:
+
+```{=tex}
+\begin{align*}
+
+
+L(\mu_1, \sigma_1, \mu_2, \sigma_2 | y_1, y_2) = \frac{1}{2\pi\sigma_1^2} \exp\left(-\frac{(y_1 - \mu_1)^2}{2\sigma_1^2}\right) \cdot \frac{1}{2\pi\sigma_2^2} \exp\left(-\frac{(y_2 - \mu_2)^2}{2\sigma_2^2}\right)
+
+\end{align*}
+```
+Prior
+
+```{=tex}
+\begin{align*}
+
+p(µ_i, \sigma²_i) \propto (\sigma^2_i)^{-1}
+
+\end{align*}
+```
+Posterior
+
+```{=tex}
+\begin{align*}
+
+p(\mu, \sigma^2 | y) \propto L(\mu_1, \sigma_1, \mu_2, \sigma_2 | y_1, y_2) * p(µ_1, \sigma^2_1) * p(µ_2, \sigma^2_2)
+
+\end{align*}
+```
+## (b)
+
+Write your answers and code here!
+
+```{r}
+# Useful functions: mean(), length(), sqrt(), sum(),
+# rtnew() (from aaltobda), quantile() and hist().
+
+y1  = windshieldy1
+y2 = windshieldy2
+
+
+  
+set.seed(100)
+sim1 = rtnew(1000,length(y1)-1, mean(y1), scale = sd(y1)/2)
+sim2 = rtnew(1000,length(y2)-1, mean(y2), scale = sd(y2)/2)
+    
+delta_mean = sim1-sim2
+
+  
+
+    
+  
+print(mean(delta_mean))
+print(mu_interval(delta_mean))
+hist(delta_mean, main = " Delta of means", xlab = "Delta of mean", col = "lightblue")
+```
+
+## (c)
+
+Write your answers here!
+
+The probability for a single point in continous distributions is always
+zero. The means are continously distributed, and this is the reason that
+the probability is zero for the means of hardness being same across two
+production lines.
+
+

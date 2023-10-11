@@ -1,0 +1,242 @@
+---
+title: "Assignment 4"
+author: anonymous # <-- hand in anonymously
+format: 
+  html:
+    toc: true
+    code-tools: true
+    code-line-numbers: true  
+    number-sections: true
+    mainfont: Georgia, serif
+    page-layout: article
+  pdf:  
+    geometry:
+    - left=1cm,top=1cm,bottom=1cm,right=7cm
+    number-sections: true
+    code-annotations: none
+editor: source
+---
+
+
+# General information
+
+The following installs and loads the `aaltobda` package:
+```{r}
+if(!require(aaltobda)){
+    install.packages("remotes")
+    remotes::install_github("avehtari/BDA_course_Aalto", subdir = "rpackage", upgrade="never")
+    library(aaltobda)
+}
+```
+The following installs and loads the [`latex2exp` package](https://github.com/stefano-meschiari/latex2exp), which allows us to use LaTeX in plots:
+```{r}
+if(!require(latex2exp)){
+    install.packages("latex2exp")
+    library(latex2exp)
+}
+```
+
+:::
+::::
+
+
+# Bioassay model 
+
+## (a)
+```{r}
+library(MASS)
+
+
+mean_vector  = c(0,10)
+
+covariance_matrix = matrix(c(2^2, 0.6*(2)*10, 0.6*10*2, 10^2), nrow = 2, ncol = 2)
+result = mvrnorm(4000, mean_vector, covariance_matrix)
+
+
+answer = c(mean(result[,1]),mean(result[,2]))
+
+cat("The means for alpha and beta of the bivariate distribution are:", round(answer,2))
+
+
+```
+
+```{r}
+covariance_matrix = matrix(c(2^2, 0.6*(2)*10, 0.6*10*2, 10^2), nrow = 2, ncol = 2)
+cat("The covariance matrix is:")
+covariance_matrix
+```
+
+## (b)
+
+
+Loading the library and the data.
+``` {r}
+# Useful functions: quantile()
+# and mcse_quantile() (from aaltobda)
+
+data("bioassay_posterior")
+# The 4000 draws are now stored in the variable `bioassay_posterior`.
+# The below displays the first rows of the data:
+head(bioassay_posterior)
+n = length(bioassay_posterior[,1])
+a_mean = mean(bioassay_posterior[,1])
+b_mean = mean(bioassay_posterior[,2])
+cat("The expected values for alpha and beta are respectively the following:", round(a_mean,2), "," , round(b_mean,2))
+cat("\n")
+cat("\n")
+
+
+a_conf = quantile(bioassay_posterior[,1],c(0.05,0.95))
+b_conf = quantile(bioassay_posterior[,2],c(0.05,0.95))
+
+cat("The 95% confidence interval for alpha is [",round(a_conf,2),"]")
+cat("\n")
+cat("\n")
+cat("The 95% confidence interval for beta is [",round(b_conf,2), "]")
+cat("\n")
+cat("\n")
+
+mcse_a_mean = sd(bioassay_posterior[,1])/sqrt(n)
+mcse_b_mean = sd(bioassay_posterior[,2])/sqrt(n)
+
+cat("The MCSE for the expected value of alpha is", round(mcse_a_mean, 2) ,"and of beta", round(mcse_b_mean,2))
+cat("\n")
+cat("\n")
+?mcse_quantile  
+mcse_a_conf_low = mcse_quantile(bioassay_posterior[,1], 0.05)
+mcse_b_conf_low = mcse_quantile(bioassay_posterior[,2],0.05)
+mcse_a_conf_up = mcse_quantile(bioassay_posterior[,1], 0.95)
+mcse_b_conf_up = mcse_quantile(bioassay_posterior[,2],0.95)
+
+cat("The MCSE for the quantiles of alpha are 0.03 and 0.04, and for the beta distribution 0.07 and 0.24")
+cat("Monte Carlo standard error estimates the inaccuracy of the samples drawn in the Monte Carlo simulation")
+cat("I chose the amount of numbers to show based on the importance of showing of the decimals, for example if we have an value of 0.99312, I wouldn't show only decimal since there is a significant difference between 0.9 and 0.99 etc...")
+```
+
+# Importance sampling
+
+## (c)
+
+
+```{r}
+# Useful functions: bioassaylp (from aaltobda)
+data("bioassay")
+alpha_test = c(1.896, -3.6,  0.374, 0.964, -3.123, -1.581)
+beta_test = c(24.76, 20.04, 6.15, 18.65, 8.16, 17.4)
+
+
+log_importance_weights <- function(alpha, beta) {
+  n <- length(alpha)
+  weights <- numeric(n)
+
+  prior_density <- numeric(n)
+  
+  for (i in 1:n) {
+    ab_vector <- c(alpha[i], beta[i])
+  
+    prior_density[i] <- sum(dmvnorm(ab_vector, mean = mean_vector, sigma = covariance_matrix, log = TRUE))
+  }
+  
+  posterior_density <- bioassaylp(alpha, beta, bioassay[, 1], bioassay[, 3], bioassay[, 2]) + prior_density
+  
+  weights <- posterior_density - prior_density
+
+  return(round(weights, 2))
+}
+
+
+log_importance_weights(alpha_test, beta_test)
+
+  
+
+```
+Logarithms make the range of values smaller, which makes the data more manageable, if there is a large variance in between values across the scale.
+
+## (d)
+
+
+```{r}
+normalized_importance_weights <- function(alpha, beta) {
+    
+    weights = log_importance_weights(alpha,beta)
+    exp_weights = exp(weights)
+    normalized_weights = exp_weights/sum(exp_weights)
+    return(normalized_weights)
+}
+
+print(normalized_importance_weights(alpha_test,beta_test))
+
+cat("By exponentiating and scaling the weights up to one, the larger weights gain a more important role and the smaller a diminshed effect. This helps to pin down on the most important samples and thus to improve the accuracy of the estimate ")
+```
+
+
+
+## (e)
+
+
+Write your answers and code here!
+
+```{r}
+distr = rmvnorm(4000, mean_vector, covariance_matrix)
+hist(log_importance_weights(distr[,1], distr[,2]))
+
+hist(normalized_importance_weights(distr[,1], distr[,2]))
+```
+
+
+
+## (f)
+
+
+```{r}
+S_eff <- function(alpha, beta) {
+    seff = 1/sum((normalized_importance_weights(alpha, beta))^2)
+    #1.354
+    return(seff)
+}
+
+
+S_eff(distr[,1], distr[,2])
+```
+
+
+
+## (g)
+When were performing importance sampling, not all observations are equal considering their effect on the estimate. 
+While in this case we have a sample size of 4000, and the effective sample size being 1093, we can interpret this as a large part of the observations do not affect the estimate in any way. We can see this in the histogram, as the majority of weights is 0, and the others are spread to "blocks". This suggests a larger irregularity across the weights.
+
+## (h)
+
+
+```{r}
+posterior_mean <- function(alpha, beta) {
+    
+    scaler = 1/S_eff(alpha,beta)
+    estimate_alpha = scaler* (sum(alpha*normalized_importance_weights(alpha,beta)))/scaler*sum(normalized_importance_weights(alpha,beta))
+    estimate_beta = scaler* (sum(beta*normalized_importance_weights(alpha,beta)))/scaler*sum(normalized_importance_weights(alpha,beta))
+    
+    return(round(c(estimate_alpha,estimate_beta),3))
+}
+
+posterior_mean(distr[,1], distr[,2])
+mcse_a = sd(distr[,1])/sqrt(length(distr[,1]))
+mcse_b= sd(distr[,2])/sqrt(length(distr[,2]))
+
+cat("The means for alpha and beta for the posterior are the following:", posterior_mean(distr[,1],distr[,2]))
+cat("\n")
+cat("The MCSE:s for the alpha and beta:" ,round(mcse_a,2), round(mcse_b,3))
+```
+
+
+
+    
+
+
+The following will check the functions for which `markmyassignment` has been set up:
+ 
+```{r}  
+```      
+
+:::
+::::
+
